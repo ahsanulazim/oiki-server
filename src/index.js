@@ -1,7 +1,8 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import userRouter from "../router/user.router.js";
+import userRouter from "../router/user.route.js";
+import variantsRouter from "../router/variant.route.js";
 
 const app = express();
 dotenv.config();
@@ -22,6 +23,7 @@ app.get("/", (req, res) => {
 
 // Routes
 app.use("/api/v1/users", userRouter);
+app.use("/api/v1/variants", variantsRouter);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
