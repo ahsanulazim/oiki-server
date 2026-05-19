@@ -2,7 +2,9 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import userRouter from "../router/user.route.js";
-import variantsRouter from "../router/variant.route.js";
+import attributeRouter from "../router/attribute.route.js";
+import variationRouter from "../router/variation.route.js";
+import productRouter from "../router/product.route.js";
 
 const app = express();
 dotenv.config();
@@ -13,7 +15,7 @@ app.use(
     credentials: true,
   }),
 );
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
 
 const PORT = process.env.PORT;
 
@@ -23,7 +25,9 @@ app.get("/", (req, res) => {
 
 // Routes
 app.use("/api/v1/users", userRouter);
-app.use("/api/v1/variants", variantsRouter);
+app.use("/api/v1/attributes", attributeRouter);
+app.use("/api/v1/variations", variationRouter);
+app.use("/api/v1/products", productRouter);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
