@@ -9,6 +9,6 @@ const router = express.Router();
 
 router.post("/createProduct", createProduct);
 router.get("/getAllProducts", getAllProducts);
-router.get("/getProductBySlug/:slug", getProductBySlug);
+router.get("/getProductBySlug", getProductBySlug);
 
 export default router;

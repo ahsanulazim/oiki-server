@@ -92,7 +92,7 @@ export const getAllProducts = async (req, res) => {
 };
 
 export const getProductBySlug = async (req, res) => {
-  const { slug } = req.params;
+  const { slug } = req.query;
 
   try {
     const product = await productCollection.findOne({ slug });
