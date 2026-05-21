@@ -1,3 +1,4 @@
+import { ObjectId } from "mongodb";
 import cloudinary from "../lib/cloudinary.js";
 import client from "../lib/db.js";
 
@@ -8,15 +9,12 @@ export const createProduct = async (req, res) => {
   const {
     productName,
     slug,
-    color,
     stock,
     productDescription,
     price,
     discount,
     category,
     productImages,
-    variants,
-    size,
     sku,
     variantDetails,
   } = req.body;
@@ -41,11 +39,25 @@ export const createProduct = async (req, res) => {
   if (variantDetails && Array.isArray(variantDetails)) {
     await Promise.all(
       variantDetails.map(async (variant) => {
-        if (variant.image) {
-          const uploadRes = await cloudinary.uploader.upload(variant.image, {
-            folder: "products",
-          });
-          variant.image = uploadRes?.secure_url || "";
+        if (variant.imageGallery && Array.isArray(variant.imageGallery)) {
+          const uploadedGallery = await Promise.all(
+            variant.imageGallery.map(async (img) => {
+              const uploadRes = await cloudinary.uploader.upload(img, {
+                folder: "products",
+              });
+              return uploadRes?.secure_url || "";
+            }),
+          );
+          variant.imageGallery = uploadedGallery;
+        }
+        if (variant.swatchImage) {
+          const uploadRes = await cloudinary.uploader.upload(
+            variant.swatchImage,
+            {
+              folder: "products",
+            },
+          );
+          variant.swatchImage = uploadRes?.secure_url || "";
         }
       }),
     );
@@ -57,15 +69,12 @@ export const createProduct = async (req, res) => {
   const product = {
     productName,
     slug,
-    color,
     stock,
     category,
     productDescription,
     price,
     discount,
     productImages: uploadedImageUrls,
-    variants,
-    size,
     sku,
     variantDetails,
     createdAt,
@@ -103,5 +112,51 @@ export const getProductBySlug = async (req, res) => {
   } catch (error) {
     console.error("Error fetching product:", error);
     res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const getNewArriavals = async (req, res) => {
+  try {
+    const newArriavals = await productCollection
+      .find()
+      .sort({ createdAt: -1 })
+      .limit(6)
+      .toArray();
+    res.status(200).json(newArriavals);
+  } catch (error) {
+    console.error("Error fetching new arrivals:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const deleteProduct = async (req, res) => {
+  const { id } = req.query;
+  try {
+    const product = await productCollection.findOne({ _id: new ObjectId(id) });
+
+    if (!product) {
+      res.status(404).json({ success: false, message: "Product not Found!" });
+    }
+
+    if (product.productImages && Array.isArray(product.productImages)) {
+      await Promise.all(
+        product.productImages.map(async (image) => {
+          const deleteImage = image.split("/").pop().split(".");
+          try {
+            await cloudinary.uploader.destroy(`/products/${deleteImage}`);
+            console.log("Deleted Image from Cloudinary");
+          } catch (error) {
+            console.error("Error Deleting Image", error);
+          }
+        }),
+      );
+    }
+
+    await productCollection.deleteOne({ _id: new ObjectId(id) });
+    res.status(200).json({ success: true, message: "Product Deleted" });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to delete Product" });
   }
 };
