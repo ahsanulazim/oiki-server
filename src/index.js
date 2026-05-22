@@ -11,7 +11,11 @@ dotenv.config();
 
 app.use(
   cors({
-    origin: ["http://localhost:3000", "https://oiki-frontend.vercel.app"],
+    origin: [
+      "http://localhost:3000",
+      "https://oiki-frontend.vercel.app",
+      "https://oiki.store",
+    ],
     credentials: true,
   }),
 );
