@@ -90,6 +90,32 @@ export const getAllShippingRates = async (req, res) => {
   }
 };
 
+export const getShippingRateByDistrict = async (req, res) => {
+  const { district } = req.query;
+
+  if (!district) {
+    res.status(400).json({ success: false, message: "District is required" });
+  }
+
+  try {
+    const insideDhaka = await shippingRateCollection.findOne({
+      "location.value": district,
+    });
+
+    if (insideDhaka) {
+      res.status(200).json(insideDhaka);
+    } else {
+      const outsideDhaka = await shippingRateCollection.findOne({
+        "location.value": "all",
+      });
+      res.status(200).json(outsideDhaka);
+    }
+  } catch (error) {
+    console.error("Error fetching shipping rate:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
 export const deleteShippingRate = async (req, res) => {
   const { id } = req.query;
 
