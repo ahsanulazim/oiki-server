@@ -1,8 +1,14 @@
 import express from "express";
-import { paymentVerify } from "../controller/zinpay.controller.js";
+import {
+  paymentVerify,
+  ziniPayCreatePayment,
+  ziniPayVerifyPayment,
+} from "../controller/zinpay.controller.js";
 
 const router = express.Router();
 
-router.post("/payment-webhook", paymentVerify);
+//router.post("/payment-webhook", paymentVerify);
+router.post("ziniPayCreatePayment", ziniPayCreatePayment);
+router.post("ziniPayVerifyPayment", ziniPayVerifyPayment);
 
 export default router;

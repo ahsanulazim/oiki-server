@@ -1,6 +1,7 @@
 import { ObjectId } from "mongodb";
 import client from "../lib/db.js";
 import dotenv from "dotenv";
+import { ziniPayCreatePayment } from "./zinpay.controller.js";
 dotenv.config();
 
 const orderCollection = client.db("oiki_store").collection("orders");
@@ -119,39 +120,70 @@ export const createOrder = async (req, res) => {
       res
         .status(201)
         .json({ success: true, message: "Order created successfully", order });
-    } else {
-      const orderId = new ObjectId();
+    }
+    // if (paymentMethod === "online") {
+    //   const orderId = new ObjectId().toString();
 
-      const zinipayRes = await fetch(
-        "https://api.zinipay.com/v1/payment/session",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.ZINIPAY_API_KEY}`,
+    // const response = await fetch(
+    //   `${process.env.ZINIPAY_URL}/payment/create`,
+    //   {
+    //     method: "POST",
+    //     headers: {
+    //       "Content-Type": "application/json",
+    //       "zini-api-key": process.env.ZINIPAY_API_KEY,
+    //     },
+    //     body: JSON.stringify({
+    //       cus_name: `${customer.firstName} ${customer.lastName}`,
+    //       cus_email: customer.email || "",
+    //       amount: totalPrice,
+    //       metadata: {
+    //         order_id: orderId,
+    //         user: user._id ? user._id : user,
+    //         customer_id: customer.phone,
+    //       },
+    //       redirect_url: `${process.env.FRONTEND_URL}/cart/checkout/payment-success`,
+    //       cancel_url: `${process.env.FRONTEND_URL}/cart/checkout/payment-cancelled`,
+    //       webhook_url: `${process.env.SERVER_URL}/zinpay/payment-webhook`,
+    //     }),
+    //   },
+    // );
+
+    if (paymentMethod === "online") {
+      try {
+        const payload = {
+          cus_name: `${customer.firstName} ${customer.lastName}`,
+          cus_email: customer.email || "",
+          amount: 1200, // তোমার হিসাব করা totalPrice
+          metadata: {
+            order_id: new ObjectId().toString(),
+            user_id: user._id ? user._id : user,
           },
-          body: JSON.stringify({
-            amount: totalPrice,
-            currency: "BDT",
-            orderId: orderId.toString(),
-            callbackUrl: `${process.env.SERVER_URL}/zinpay/payment-webhook`,
-          }),
-        },
-      );
+          redirect_url: `${process.env.FRONTEND_URL}/payment/success`,
+          cancel_url: `${process.env.FRONTEND_URL}/payment/cancel`,
+          val_id: "INV-" + Date.now(),
+          webhook_url: `${process.env.SERVER_URL}/api/zinpay/webhook`,
+        };
 
-      const zinipayData = await zinipayRes.json();
+        const data = await ziniPayCreatePayment(
+          payload,
+          process.env.ZINIPAY_API_KEY,
+        );
 
-      // ✅ Order এখনো save হবে না
-      return res.status(200).json({
-        success: true,
-        paymentUrl: zinipayData.checkoutUrl,
-        orderId: orderId.toString(),
-        customer,
-        products: orderProducts,
-        shippingCharge,
-        subtotal,
-        totalPrice,
-      });
+        if (data?.payment_url) {
+          return res.json({ success: true, paymentUrl: data.payment_url });
+        } else {
+          return res.status(400).json({
+            success: false,
+            message: "Payment URL not found",
+            error: data,
+          });
+        }
+      } catch (err) {
+        console.error("Payment create error:", err.message);
+        return res
+          .status(500)
+          .json({ success: false, message: "Payment session creation failed" });
+      }
     }
   } catch (error) {
     console.error("Error creating order:", error);
@@ -183,6 +215,51 @@ export const getAllOrderData = async (req, res) => {
       .json({ success: true, message: "Orders fetched successfully", orders });
   } catch (error) {
     console.error("Error fetching orders:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+export const deleteOrder = async (req, res) => {
+  try {
+    const { id } = req.query;
+
+    const order = await orderCollection.findOne({ _id: new ObjectId(id) });
+    if (!order) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Order not found" });
+    }
+
+    order.products.forEach(async (product) => {
+      const productData = await productCollection.findOne({
+        _id: new ObjectId(product.productId),
+      });
+      const variantData = productData.variantDetails.map((variant) => {
+        if (variant.color === product.color) {
+          return {
+            ...variant,
+            sizes: variant.sizes.map((size) =>
+              size.size === product.size
+                ? { ...size, stock: size.stock + product.quantity }
+                : size,
+            ),
+          };
+        }
+        return variant;
+      });
+
+      await productCollection.updateOne(
+        { _id: new ObjectId(product.productId) },
+        { $set: { variantDetails: variantData } },
+      );
+    });
+
+    await orderCollection.deleteOne({ _id: new ObjectId(id) });
+    res
+      .status(200)
+      .json({ success: true, message: "Order deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting order:", error);
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
