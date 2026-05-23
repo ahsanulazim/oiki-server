@@ -1,14 +1,17 @@
 import { ObjectId } from "mongodb";
 import client from "../lib/db.js";
+import dotenv from "dotenv";
+dotenv.config();
 
 const orderCollection = client.db("oiki_store").collection("orders");
 const productCollection = client.db("oiki_store").collection("products");
 const shippingRateCollection = client
   .db("oiki_store")
   .collection("shipping_rates");
+const userCollection = client.db("oiki_store").collection("users");
 
 export const createOrder = async (req, res) => {
-  const { customer, products, user } = req.body;
+  const { customer, products, user, paymentMethod } = req.body;
 
   if (!customer || !products) {
     return res
@@ -87,7 +90,6 @@ export const createOrder = async (req, res) => {
         size: product.size,
         quantity: product.quantity,
         price: unitPrice, // ✅ database থেকে আসল price
-        image: productData.productImages,
       });
     }
 
@@ -99,23 +101,58 @@ export const createOrder = async (req, res) => {
     const totalPrice = subtotal + shippingCharge;
 
     // 4. Order বানাও
-    const order = {
-      user: user._id ? user._id : user,
-      customer,
-      products: orderProducts,
-      shippingCharge,
-      subtotal,
-      totalPrice,
-      status: "pending",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    if (paymentMethod === "cod") {
+      const order = {
+        user: user._id ? user._id : user,
+        customer,
+        products: orderProducts,
+        shippingCharge,
+        subtotal,
+        totalPrice,
+        status: "pending",
+        paymentMethod,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      await orderCollection.insertOne(order);
 
-    await orderCollection.insertOne(order);
+      res
+        .status(201)
+        .json({ success: true, message: "Order created successfully", order });
+    } else {
+      const orderId = new ObjectId();
 
-    res
-      .status(201)
-      .json({ success: true, message: "Order created successfully", order });
+      const zinipayRes = await fetch(
+        "https://api.zinipay.com/v1/payment/session",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.ZINIPAY_API_KEY}`,
+          },
+          body: JSON.stringify({
+            amount: totalPrice,
+            currency: "BDT",
+            orderId: orderId.toString(),
+            callbackUrl: `${process.env.SERVER_URL}/zinpay/payment-webhook`,
+          }),
+        },
+      );
+
+      const zinipayData = await zinipayRes.json();
+
+      // ✅ Order এখনো save হবে না
+      return res.status(200).json({
+        success: true,
+        paymentUrl: zinipayData.checkoutUrl,
+        orderId: orderId.toString(),
+        customer,
+        products: orderProducts,
+        shippingCharge,
+        subtotal,
+        totalPrice,
+      });
+    }
   } catch (error) {
     console.error("Error creating order:", error);
     res.status(500).json({ success: false, message: "Internal server error" });
@@ -124,10 +161,23 @@ export const createOrder = async (req, res) => {
 
 export const getAllOrderData = async (req, res) => {
   try {
-    const orders = await orderCollection
+    const orderData = await orderCollection
       .find({})
       .sort({ createdAt: -1 })
       .toArray();
+
+    const userData = await userCollection.find({}).toArray();
+
+    const orders = orderData.map((order) => {
+      const user = userData.find(
+        (u) => u._id.toString() === order.user.toString(),
+      );
+      if (user) {
+        return { user, ...order };
+      }
+      return { ...order };
+    });
+
     res
       .status(200)
       .json({ success: true, message: "Orders fetched successfully", orders });

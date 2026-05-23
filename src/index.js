@@ -8,6 +8,7 @@ import productRouter from "../router/product.route.js";
 import locationRouter from "../router/location.route.js";
 import shippingRatesRouter from "../router/shipping.route.js";
 import orderRouter from "../router/order.route.js";
+import zinpayRouter from "../router/zinpay.route.js";
 
 const app = express();
 dotenv.config();
@@ -38,6 +39,7 @@ app.use("/api/v1/products", productRouter);
 app.use("/api/v1/locations", locationRouter);
 app.use("/api/v1/shippingRates", shippingRatesRouter);
 app.use("/api/v1/orders", orderRouter);
+app.use("/api/v1/zinpay", zinpayRouter);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
