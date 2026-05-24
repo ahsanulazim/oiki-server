@@ -121,48 +121,24 @@ export const createOrder = async (req, res) => {
         .status(201)
         .json({ success: true, message: "Order created successfully", order });
     }
-    // if (paymentMethod === "online") {
-    //   const orderId = new ObjectId().toString();
-
-    // const response = await fetch(
-    //   `${process.env.ZINIPAY_URL}/payment/create`,
-    //   {
-    //     method: "POST",
-    //     headers: {
-    //       "Content-Type": "application/json",
-    //       "zini-api-key": process.env.ZINIPAY_API_KEY,
-    //     },
-    //     body: JSON.stringify({
-    //       cus_name: `${customer.firstName} ${customer.lastName}`,
-    //       cus_email: customer.email || "",
-    //       amount: totalPrice,
-    //       metadata: {
-    //         order_id: orderId,
-    //         user: user._id ? user._id : user,
-    //         customer_id: customer.phone,
-    //       },
-    //       redirect_url: `${process.env.FRONTEND_URL}/cart/checkout/payment-success`,
-    //       cancel_url: `${process.env.FRONTEND_URL}/cart/checkout/payment-cancelled`,
-    //       webhook_url: `${process.env.SERVER_URL}/zinpay/payment-webhook`,
-    //     }),
-    //   },
-    // );
 
     if (paymentMethod === "online") {
       try {
         const payload = {
           cus_name: `${customer.firstName} ${customer.lastName}`,
           cus_email: customer.email || "",
-          amount: 1200, // তোমার হিসাব করা totalPrice
+          amount: totalPrice, // তোমার হিসাব করা totalPrice
           metadata: {
             order_id: new ObjectId().toString(),
             user_id: user._id ? user._id : user,
           },
-          redirect_url: `${process.env.FRONTEND_URL}/payment/success`,
-          cancel_url: `${process.env.FRONTEND_URL}/payment/cancel`,
+          redirect_url: `${process.env.FRONTEND_URL}/cart/checkout/payment-success`,
+          cancel_url: `${process.env.FRONTEND_URL}/cart/checkout/payment-cancelled`,
           val_id: "INV-" + Date.now(),
-          webhook_url: `${process.env.SERVER_URL}/api/zinpay/webhook`,
+          webhook_url: `${process.env.SERVER_URL}/zinpay/payment-webhook`,
         };
+
+        console.log(payload);
 
         const data = await ziniPayCreatePayment(
           payload,

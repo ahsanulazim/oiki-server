@@ -10,5 +10,6 @@ const router = express.Router();
 //router.post("/payment-webhook", paymentVerify);
 router.post("ziniPayCreatePayment", ziniPayCreatePayment);
 router.post("ziniPayVerifyPayment", ziniPayVerifyPayment);
+router.post("/payment-webhook", paymentVerify);
 
 export default router;
