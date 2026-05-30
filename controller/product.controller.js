@@ -160,3 +160,26 @@ export const deleteProduct = async (req, res) => {
       .json({ success: false, message: "Failed to delete Product" });
   }
 };
+
+export const getCategoryFilters = async (req, res) => {
+  const { category } = req.query;
+  try {
+    const pipeline = [
+      { $match: { category } },
+      {
+        $group: {
+          _id: null,
+          minPrice: { $min: { $toInt: "$price" } },
+          maxPrice: { $max: { $toInt: "$price" } },
+          colors: { $addToSet: "$variantDetails.color" },
+          sizes: { $addToSet: "$variantDetails.sizes.size" },
+        },
+      },
+    ];
+
+    const filter = await productCollection.aggregate(pipeline).toArray();
+    res.json(filter[0]);
+  } catch (error) {
+    res.status(500).json({ message: "FIlters error" });
+  }
+};

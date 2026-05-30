@@ -239,3 +239,21 @@ export const deleteOrder = async (req, res) => {
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
+
+export const getOrderDetails = async (req, res) => {
+  const { orderId } = req.query;
+
+  try {
+    const order = await orderCollection.findOne({ _id: new ObjectId(orderId) });
+    if (!order) {
+      res.status(404).json({ success: false, message: "Order Not Found" });
+    }
+
+    return res.status(200).json({ success: true, order });
+  } catch (error) {
+    console.error("Error fetching orders:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Unable to fetch order data" });
+  }
+};
