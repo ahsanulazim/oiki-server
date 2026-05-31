@@ -134,7 +134,6 @@ export const deleteShippingRate = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Shipping rate not found" });
     }
-    await shippingRateCollection.deleteOne({ _id: new ObjectId(id) });
     if (shippingRate.companyLogo) {
       const deleteImage = shippingRate.companyLogo.split("/").pop().split(".");
       try {
@@ -144,6 +143,7 @@ export const deleteShippingRate = async (req, res) => {
         console.error("Error Deleting Image", error);
       }
     }
+    await shippingRateCollection.deleteOne({ _id: new ObjectId(id) });
     res
       .status(200)
       .json({ success: true, message: "Shipping rate deleted successfully" });

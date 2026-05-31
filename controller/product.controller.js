@@ -1,9 +1,7 @@
 import { ObjectId } from "mongodb";
 import cloudinary from "../lib/cloudinary.js";
 import client from "../lib/db.js";
-
-const productCollection = client.db("oiki_store").collection("products");
-await productCollection.createIndex({ slug: 1 }, { unique: true });
+import { productCollection } from "../db/db.collection.js";
 
 export const createProduct = async (req, res) => {
   const {
@@ -111,6 +109,41 @@ export const getProductBySlug = async (req, res) => {
     res.status(200).json(product);
   } catch (error) {
     console.error("Error fetching product:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const getProductsByCategory = async (req, res) => {
+  const { category } = req.query;
+  const page = Math.max(parseInt(req.query.page) || 1, 1);
+  const limit = Math.min(parseInt(req.query.limit) || 10, 20);
+  const skip = (page - 1) * limit;
+
+  try {
+    const products = await productCollection
+      .find({ category })
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+
+    if (!products) {
+      return res.status(404).json({ message: "Products not found" });
+    }
+
+    const totalProducts = await productCollection.countDocuments();
+    res
+      .status(200)
+      .json({
+        products,
+        totalPages: Math.ceil(totalProducts / limit),
+        currentPage: page,
+        hasNext: page * limit < totalProducts,
+        hasPrev: page > 1,
+        start: skip + 1,
+        end: Math.min(skip + limit, totalProducts),
+      });
+  } catch (error) {
+    console.error("Error fetching products:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
