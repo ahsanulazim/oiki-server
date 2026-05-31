@@ -1,6 +1,4 @@
-import client from "../lib/db.js";
-
-const locationCollection = client.db("oiki_store").collection("locations");
+import { locationCollection } from "../db/db.collection.js";
 
 export const getAllLocations = async (req, res) => {
   try {

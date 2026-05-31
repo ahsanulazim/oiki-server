@@ -2,14 +2,17 @@ import { ObjectId } from "mongodb";
 import client from "../lib/db.js";
 import dotenv from "dotenv";
 import { ziniPayCreatePayment } from "./zinpay.controller.js";
+import {
+  locationCollection,
+  productCollection,
+  userCollection,
+} from "../db/db.collection.js";
 dotenv.config();
 
 const orderCollection = client.db("oiki_store").collection("orders");
-const productCollection = client.db("oiki_store").collection("products");
 const shippingRateCollection = client
   .db("oiki_store")
   .collection("shipping_rates");
-const userCollection = client.db("oiki_store").collection("users");
 
 export const createOrder = async (req, res) => {
   const { customer, products, user, paymentMethod } = req.body;
@@ -249,7 +252,72 @@ export const getOrderDetails = async (req, res) => {
       res.status(404).json({ success: false, message: "Order Not Found" });
     }
 
-    return res.status(200).json({ success: true, order });
+    const customer = order.customer;
+    const customerDistrict = customer.district;
+
+    const district = await locationCollection.findOne({ id: customerDistrict });
+
+    const customerData = {
+      name: customer.firstName + " " + customer.lastName,
+      address:
+        customer.address + ", " + customer.thana + ", " + district.name.en,
+      email: customer.email,
+      phone: customer.phone,
+      comment: customer.comment,
+    };
+
+    const enrichedProducts = await Promise.all(
+      order.products.map(async (p) => {
+        const product = await productCollection.findOne({
+          _id: new ObjectId(p.productId),
+        });
+        const variant = product.variantDetails.find(
+          (v) => v.color.toLowerCase() === p.color.toLowerCase(),
+        );
+        const imageLink = variant.swatchImage;
+        return {
+          ...p,
+          category: product.category,
+          image: imageLink || null,
+        };
+      }),
+    );
+
+    const enrichedOrder = {
+      ...order,
+      products: enrichedProducts,
+    };
+
+    if (order.user === "guest") {
+      return res.status(200).json({
+        success: true,
+        order: { ...enrichedOrder, customer: customerData },
+      });
+    }
+
+    const userID = order.user;
+    const user = await userCollection.findOne({ _id: new ObjectId(userID) });
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User Not Found" });
+    }
+
+    const userData = {
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+    };
+
+    return res.status(200).json({
+      success: true,
+      order: {
+        ...enrichedOrder,
+        user: userData,
+        customer: customerData,
+      },
+    });
   } catch (error) {
     console.error("Error fetching orders:", error);
     res
