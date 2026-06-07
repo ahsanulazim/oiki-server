@@ -1,6 +1,5 @@
 import { ObjectId } from "mongodb";
 import cloudinary from "../lib/cloudinary.js";
-import client from "../lib/db.js";
 import { productCollection } from "../db/db.collection.js";
 
 export const createProduct = async (req, res) => {
@@ -113,35 +112,70 @@ export const getProductBySlug = async (req, res) => {
   }
 };
 
-export const getProductsByCategory = async (req, res) => {
-  const { category } = req.query;
+export const getProductsByFilters = async (req, res) => {
+  const { category, minPrice, maxPrice, sizes, colors, stock } = req.query;
+
+  console.log("categories", category);
+  console.log("minPrice", minPrice);
+  console.log("maxPrice", maxPrice);
+  console.log("sizes", sizes);
+  console.log("colors", colors);
+  console.log("stock", stock);
+
   const page = Math.max(parseInt(req.query.page) || 1, 1);
   const limit = Math.min(parseInt(req.query.limit) || 10, 20);
   const skip = (page - 1) * limit;
 
   try {
+    // ✅ Dynamic filter condition
+    const filter = { category };
+
+    if (minPrice || maxPrice) {
+      filter["variantDetails.sizes.price"] = {};
+      if (minPrice)
+        filter["variantDetails.sizes.price"].$gte = Number(minPrice);
+      if (maxPrice)
+        filter["variantDetails.sizes.price"].$lte = Number(maxPrice);
+    }
+
+    if (sizes) {
+      filter["variantDetails.sizes.size"] = { $in: sizes.split(",") };
+    }
+
+    if (colors) {
+      filter["variantDetails.color"] = { $in: colors.split(",") };
+    }
+
+    if (stock === "in") {
+      filter["variantDetails.sizes.stock"] = { $gt: 0 };
+    } else if (stock === "out") {
+      filter["variantDetails.sizes.stock"] = { $eq: 0 };
+    }
+
+    // ✅ Query with filter + pagination
     const products = await productCollection
-      .find({ category })
+      .find(filter)
       .skip(skip)
       .limit(limit)
       .toArray();
 
-    if (!products) {
-      return res.status(404).json({ message: "Products not found" });
+    if (!products || products.length === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Products not found" });
     }
 
-    const totalProducts = await productCollection.countDocuments();
-    res
-      .status(200)
-      .json({
-        products,
-        totalPages: Math.ceil(totalProducts / limit),
-        currentPage: page,
-        hasNext: page * limit < totalProducts,
-        hasPrev: page > 1,
-        start: skip + 1,
-        end: Math.min(skip + limit, totalProducts),
-      });
+    const totalProducts = await productCollection.countDocuments(filter);
+
+    res.status(200).json({
+      products,
+      totalPages: Math.ceil(totalProducts / limit),
+      currentPage: page,
+      hasNext: page * limit < totalProducts,
+      hasPrev: page > 1,
+      start: skip + 1,
+      end: Math.min(skip + limit, totalProducts),
+    });
   } catch (error) {
     console.error("Error fetching products:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -199,13 +233,32 @@ export const getCategoryFilters = async (req, res) => {
   try {
     const pipeline = [
       { $match: { category } },
+
+      // Flatten variantDetails
+      { $unwind: "$variantDetails" },
+
+      // Flatten sizes array inside variantDetails
+      { $unwind: "$variantDetails.sizes" },
+
       {
         $group: {
           _id: null,
-          minPrice: { $min: { $toInt: "$price" } },
-          maxPrice: { $max: { $toInt: "$price" } },
-          colors: { $addToSet: "$variantDetails.color" },
+          minPrice: { $min: { $toInt: "$variantDetails.sizes.price" } },
+          maxPrice: { $max: { $toInt: "$variantDetails.sizes.price" } },
+          colors: {
+            $addToSet: {
+              color: "$variantDetails.color",
+              hex: "$variantDetails.hex",
+              swatchImage: "$variantDetails.swatchImage",
+            },
+          },
           sizes: { $addToSet: "$variantDetails.sizes.size" },
+          stockStatus: {
+            $addToSet: {
+              size: "$variantDetails.sizes.size",
+              stock: "$variantDetails.sizes.stock",
+            },
+          },
         },
       },
     ];
@@ -213,6 +266,6 @@ export const getCategoryFilters = async (req, res) => {
     const filter = await productCollection.aggregate(pipeline).toArray();
     res.json(filter[0]);
   } catch (error) {
-    res.status(500).json({ message: "FIlters error" });
+    res.status(500).json({ message: "Filters error" });
   }
 };

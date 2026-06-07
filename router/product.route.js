@@ -6,7 +6,7 @@ import {
   getCategoryFilters,
   getNewArriavals,
   getProductBySlug,
-  getProductsByCategory,
+  getProductsByFilters,
 } from "../controller/product.controller.js";
 
 const router = express.Router();
@@ -14,7 +14,7 @@ const router = express.Router();
 router.post("/createProduct", createProduct);
 router.get("/getAllProducts", getAllProducts);
 router.get("/getProductBySlug", getProductBySlug);
-router.get("/getProductsByCategory", getProductsByCategory);
+router.get("/getProductsByFilters", getProductsByFilters);
 router.get("/getNewArrivals", getNewArriavals);
 router.get("/getCategoryFIlters", getCategoryFilters);
 router.delete("/deleteProduct", deleteProduct);
