@@ -6,8 +6,6 @@ await userCollection.createIndex({ email: 1 }, { unique: true });
 export const createUser = async (req, res) => {
   const { name, email } = req.body;
 
-  console.log(name, email);
-
   const role = "user";
   const createdAt = new Date();
   const updatedAt = new Date();
