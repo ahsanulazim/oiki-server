@@ -5,6 +5,9 @@ await userCollection.createIndex({ email: 1 }, { unique: true });
 
 export const createUser = async (req, res) => {
   const { name, email } = req.body;
+
+  console.log(name, email);
+
   const role = "user";
   const createdAt = new Date();
   const updatedAt = new Date();
@@ -58,5 +61,29 @@ export const getUser = async (req, res) => {
     res.status(200).json({ success: true, user });
   } catch (error) {
     res.status(500).json({ success: false, message: "Error fetching user" });
+  }
+};
+
+export const deleteUser = async (req, res) => {
+  const { email } = req.query;
+
+  if (!email) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Email is required" });
+  }
+
+  try {
+    const result = await userCollection.deleteOne({ email });
+    if (result.deletedCount === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+    res
+      .status(200)
+      .json({ success: true, message: "User deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error deleting user" });
   }
 };
