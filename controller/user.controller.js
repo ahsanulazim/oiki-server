@@ -85,3 +85,30 @@ export const deleteUser = async (req, res) => {
     res.status(500).json({ success: false, message: "Error deleting user" });
   }
 };
+
+export const updateUser = async (req, res) => {
+  const { email } = req.query;
+
+  if (!email) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Email is required" });
+  }
+
+  const updatedData = req.body;
+
+  try {
+    const result = await userCollection.updateOne(
+      { email },
+      { $set: updatedData },
+    );
+    if (result.modifiedCount > 0) {
+      return res
+        .status(200)
+        .json({ success: true, message: "User updated successfully" });
+    }
+    res.status(200).json({ success: true, message: "User not updated" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error updating user" });
+  }
+};
