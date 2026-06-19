@@ -2,6 +2,7 @@ import express from "express";
 import {
   createUser,
   deleteUser,
+  getAllUsers,
   getUser,
   updateUser,
 } from "../controller/user.controller.js";
@@ -13,5 +14,6 @@ router.post("/createUser", createUser);
 router.get("/getUser", getUser);
 router.delete("/deleteUser", deleteUser);
 router.put("/updateUser", updateUser);
+router.get("/getAllUsers", getAllUsers);
 
 export default router;

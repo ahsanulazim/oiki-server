@@ -1,10 +1,11 @@
+import admin from "../firebase/firebase.config.js";
 import client from "../lib/db.js";
 
 const userCollection = client.db("oiki_store").collection("users");
 await userCollection.createIndex({ email: 1 }, { unique: true });
 
 export const createUser = async (req, res) => {
-  const { name, email } = req.body;
+  const { name, email, isGoogle } = req.body;
 
   const role = "user";
   const createdAt = new Date();
@@ -13,6 +14,7 @@ export const createUser = async (req, res) => {
   const newUser = {
     name,
     email,
+    isGoogle,
     role,
     createdAt,
     updatedAt,
@@ -27,9 +29,7 @@ export const createUser = async (req, res) => {
 
   try {
     await userCollection.insertOne(newUser);
-    res
-      .status(201)
-      .json({ success: true, message: "User created successfully" });
+    res.status(201).json({ success: true, user: newUser });
   } catch (error) {
     if (error.code === 11000) {
       return res
@@ -73,6 +73,9 @@ export const deleteUser = async (req, res) => {
   }
 
   try {
+    const userRecord = await admin.auth().getUserByEmail(email);
+    await admin.auth().deleteUser(userRecord.uid);
+
     const result = await userCollection.deleteOne({ email });
     if (result.deletedCount === 0) {
       return res
@@ -111,5 +114,38 @@ export const updateUser = async (req, res) => {
     res.status(200).json({ success: true, message: "User not updated" });
   } catch (error) {
     res.status(500).json({ success: false, message: "Error updating user" });
+  }
+};
+
+// Get all users
+export const getAllUsers = async (req, res) => {
+  const page = Number(req.query.page) || 1;
+  const limit = 10;
+
+  const skip = (page - 1) * limit;
+
+  try {
+    const users = await userCollection
+      .find({ role: "user" })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+    const totalUsers = await userCollection.countDocuments({ role: "user" });
+    const totalPages = Math.ceil(totalUsers / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
+
+    res.status(200).json({
+      success: true,
+      users,
+      limit,
+      totalUsers,
+      totalPages,
+      hasNextPage,
+      hasPrevPage,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch users", error });
   }
 };
