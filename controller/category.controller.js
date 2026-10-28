@@ -1,6 +1,7 @@
 import { ObjectId } from "mongodb";
 import { categoryCollection } from "../db/db.collection.js";
 import cloudinary from "../lib/cloudinary.js";
+import { emitRealtimeEvent } from "../lib/socket.js";
 
 export const createCategory = async (req, res) => {
   const { name, slug, thumbnail } = req.body;
@@ -26,6 +27,8 @@ export const createCategory = async (req, res) => {
 
   try {
     await categoryCollection.insertOne(category);
+    emitRealtimeEvent("category:updated", { action: "created", slug });
+    emitRealtimeEvent("dashboard:update", { type: "category", action: "created" });
     res.status(201).json({ success: true, message: "Category is created" });
   } catch (error) {
     res
@@ -56,7 +59,7 @@ export const deleteCategory = async (req, res) => {
     });
 
     if (!category) {
-      res.status(404).json({ success: false, message: "Cannot Find Category" });
+      return res.status(404).json({ success: false, message: "Cannot Find Category" });
     }
 
     if (category.coverThumbnail) {
@@ -69,6 +72,8 @@ export const deleteCategory = async (req, res) => {
     }
 
     await categoryCollection.deleteOne({ _id: new ObjectId(id) });
+    emitRealtimeEvent("category:updated", { action: "deleted", categoryId: id });
+    emitRealtimeEvent("dashboard:update", { type: "category", action: "deleted" });
     res.status(200).json({ success: true, message: "Category Deleted" });
   } catch (error) {
     res

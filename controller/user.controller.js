@@ -1,11 +1,13 @@
 import admin from "../firebase/firebase.config.js";
+import cloudinary from "../lib/cloudinary.js";
 import client from "../lib/db.js";
+import { emitRealtimeEvent } from "../lib/socket.js";
 
 const userCollection = client.db("oiki_store").collection("users");
 await userCollection.createIndex({ email: 1 }, { unique: true });
 
 export const createUser = async (req, res) => {
-  const { name, email, isGoogle } = req.body;
+  const { name, email, isGoogle, photoURL = "" } = req.body;
 
   const role = "user";
   const createdAt = new Date();
@@ -15,6 +17,7 @@ export const createUser = async (req, res) => {
     name,
     email,
     isGoogle,
+    photoURL,
     role,
     createdAt,
     updatedAt,
@@ -29,6 +32,8 @@ export const createUser = async (req, res) => {
 
   try {
     await userCollection.insertOne(newUser);
+    emitRealtimeEvent("user:updated", { action: "created", email });
+    emitRealtimeEvent("dashboard:update", { type: "user", action: "created" });
     res.status(201).json({ success: true, user: newUser });
   } catch (error) {
     if (error.code === 11000) {
@@ -82,6 +87,8 @@ export const deleteUser = async (req, res) => {
         .status(404)
         .json({ success: false, message: "User not found" });
     }
+    emitRealtimeEvent("user:updated", { action: "deleted", email });
+    emitRealtimeEvent("dashboard:update", { type: "user", action: "deleted" });
     res
       .status(200)
       .json({ success: true, message: "User deleted successfully" });
@@ -99,21 +106,55 @@ export const updateUser = async (req, res) => {
       .json({ success: false, message: "Email is required" });
   }
 
-  const updatedData = req.body;
-
   try {
-    const result = await userCollection.updateOne(
-      { email },
-      { $set: updatedData },
-    );
-    if (result.modifiedCount > 0) {
+    const existingUser = await userCollection.findOne({ email });
+    if (!existingUser) {
       return res
-        .status(200)
-        .json({ success: true, message: "User updated successfully" });
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
-    res.status(200).json({ success: true, message: "User not updated" });
+
+    const { _id, role, avatar, removePhoto, ...allowedUpdates } =
+      req.body || {};
+
+    // Handle new profile picture upload via Cloudinary
+    if (
+      avatar &&
+      typeof avatar === "string" &&
+      avatar.startsWith("data:image")
+    ) {
+      const uploadRes = await cloudinary.uploader.upload(avatar, {
+        folder: "avatars",
+        transformation: [
+          { width: 400, height: 400, crop: "fill", gravity: "face" },
+        ],
+      });
+      if (uploadRes?.secure_url) {
+        allowedUpdates.photoURL = uploadRes.secure_url;
+      }
+    } else if (removePhoto) {
+      allowedUpdates.photoURL = "";
+    }
+
+    allowedUpdates.updatedAt = new Date();
+
+    await userCollection.updateOne({ email }, { $set: allowedUpdates });
+
+    const updatedUser = await userCollection.findOne({ email });
+
+    emitRealtimeEvent("user:updated", { action: "updated", email });
+    emitRealtimeEvent("dashboard:update", { type: "user", action: "updated" });
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      user: updatedUser,
+    });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Error updating user" });
+    console.error("Error updating user:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Error updating user" });
   }
 };
 

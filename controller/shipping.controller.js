@@ -1,13 +1,14 @@
 import { ObjectId } from "mongodb";
 import cloudinary from "../lib/cloudinary.js";
 import client from "../lib/db.js";
+import { emitRealtimeEvent } from "../lib/socket.js";
 
 const shippingRateCollection = client
   .db("oiki_store")
   .collection("shipping_rates");
 
 export const createShippingRate = async (req, res) => {
-  const {
+  let {
     baseCharge,
     companyLogo,
     companyName,
@@ -68,6 +69,8 @@ export const createShippingRate = async (req, res) => {
 
   try {
     await shippingRateCollection.insertOne(shippingRate);
+    emitRealtimeEvent("shipping:updated", { action: "created" });
+    emitRealtimeEvent("dashboard:update", { type: "shipping", action: "created" });
     res
       .status(201)
       .json({ success: true, message: "Shipping rate created successfully" });
@@ -94,7 +97,7 @@ export const getShippingRateByDistrict = async (req, res) => {
   const { district } = req.query;
 
   if (!district) {
-    res.status(400).json({ success: false, message: "District is required" });
+    return res.status(400).json({ success: false, message: "District is required" });
   }
 
   try {
@@ -120,7 +123,7 @@ export const deleteShippingRate = async (req, res) => {
   const { id } = req.query;
 
   if (!id) {
-    res
+    return res
       .status(400)
       .json({ success: false, message: "Shipping rate ID is required" });
   }
@@ -130,7 +133,7 @@ export const deleteShippingRate = async (req, res) => {
       _id: new ObjectId(id),
     });
     if (!shippingRate) {
-      res
+      return res
         .status(404)
         .json({ success: false, message: "Shipping rate not found" });
     }
@@ -144,6 +147,8 @@ export const deleteShippingRate = async (req, res) => {
       }
     }
     await shippingRateCollection.deleteOne({ _id: new ObjectId(id) });
+    emitRealtimeEvent("shipping:updated", { action: "deleted", shippingRateId: id });
+    emitRealtimeEvent("dashboard:update", { type: "shipping", action: "deleted" });
     res
       .status(200)
       .json({ success: true, message: "Shipping rate deleted successfully" });

@@ -6,14 +6,14 @@ import {
   getUser,
   updateUser,
 } from "../controller/user.controller.js";
+import { verifyAdmin, verifyToken } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
-// Example route for creating a user
 router.post("/createUser", createUser);
 router.get("/getUser", getUser);
-router.delete("/deleteUser", deleteUser);
-router.put("/updateUser", updateUser);
-router.get("/getAllUsers", getAllUsers);
+router.delete("/deleteUser", verifyToken, verifyAdmin, deleteUser);
+router.put("/updateUser", verifyToken, updateUser);
+router.get("/getAllUsers", verifyToken, verifyAdmin, getAllUsers);
 
 export default router;

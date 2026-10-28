@@ -11,3 +11,6 @@ export const categoryCollection = client
   .db("oiki_store")
   .collection("categories");
 await categoryCollection.createIndex({ slug: 1 }, { unique: true });
+export const couponCollection = client.db("oiki_store").collection("coupons");
+await couponCollection.createIndex({ code: 1 }, { unique: true });
+export const reviewCollection = client.db("oiki_store").collection("reviews");

@@ -2,7 +2,9 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const steadFastApiFetch = async (endpoint, options = {}) => {
-  const res = await fetch(`${process.env.STEADFAST_BASE_URL}${endpoint}`, {
+  const baseUrl =
+    process.env.STEADFAST_BASE_URL || "https://portal.packzy.com/api/v1";
+  const res = await fetch(`${baseUrl}${endpoint}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -12,26 +14,39 @@ const steadFastApiFetch = async (endpoint, options = {}) => {
     },
   });
 
+  const data = await res.json().catch(() => null);
+
   if (!res.ok) {
-    throw new Error(`API Error: ${res.status} ${res.statusText}`);
+    throw new Error(
+      data?.message || `Steadfast API Error: ${res.status} ${res.statusText}`,
+    );
   }
-  return res.json();
+  return data;
 };
 
-// ✅ Create Order
-export const createOrder = async (orderData) => {
-  return steadFastApiFetch("/create-order", {
+// Create Order in Steadfast (Packzy)
+export const createSteadfastOrder = async (orderData) => {
+  return steadFastApiFetch("/create_order", {
     method: "POST",
     body: JSON.stringify(orderData),
   });
 };
 
-// ✅ Check Balance
-export const checkBalance = async () => {
-  return steadFastApiFetch("/balance", { method: "GET" });
+// Check Balance
+export const checkSteadfastBalance = async () => {
+  return steadFastApiFetch("/get_balance", { method: "GET" });
 };
 
-// ✅ Track Order
-export const trackOrder = async (trackingId) => {
-  return steadFastApiFetch(`/track/${trackingId}`, { method: "GET" });
+// Track Order by Tracking Code
+export const trackSteadfastByCode = async (trackingCode) => {
+  return steadFastApiFetch(`/status_by_trackingcode/${trackingCode}`, {
+    method: "GET",
+  });
+};
+
+// Track Order by Invoice
+export const trackSteadfastByInvoice = async (invoice) => {
+  return steadFastApiFetch(`/status_by_invoice/${invoice}`, {
+    method: "GET",
+  });
 };

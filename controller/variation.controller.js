@@ -1,5 +1,6 @@
 import { ObjectId } from "mongodb";
 import client from "../lib/db.js";
+import { emitRealtimeEvent } from "../lib/socket.js";
 
 const variationCollection = client.db("oiki_store").collection("variations");
 await variationCollection.createIndex({ slug: 1 }, { unique: true });
@@ -26,6 +27,8 @@ export const createVariation = async (req, res) => {
 
   try {
     await variationCollection.insertOne(newVariation);
+    emitRealtimeEvent("variation:updated", { action: "created", slug, attributeSlug });
+    emitRealtimeEvent("dashboard:update", { type: "variation", action: "created" });
     res
       .status(201)
       .json({ success: true, message: "Variation created successfully" });
@@ -66,6 +69,8 @@ export const deleteVariation = async (req, res) => {
   const { id } = req.query;
   try {
     await variationCollection.deleteOne({ _id: new ObjectId(id) });
+    emitRealtimeEvent("variation:updated", { action: "deleted", variationId: id });
+    emitRealtimeEvent("dashboard:update", { type: "variation", action: "deleted" });
     res
       .status(200)
       .json({ success: true, message: "Variation deleted successfully" });
